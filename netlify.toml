@@ -1,0 +1,25 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# Single Page Application Redirects
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# HTTP Security Headers (Defesa em Profundidade OWASP 2025)
+[[headers]]
+  for = "/*"
+  [headers.values]
+    # Previne Clickjacking impedindo que o painel seja carregado em iframes externos
+    X-Frame-Options = "DENY"
+    Content-Security-Policy = "frame-ancestors 'none'; default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https: blob:; connect-src 'self' https://*.supabase.co https://api.mercadopago.com;"
+    # Previne sniffing de MIME type
+    X-Content-Type-Options = "nosniff"
+    # Previne vazamento de referrer
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    # Força uso de HTTPS estrito
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
+    # Restrição de recursos de hardware
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=()"
