@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Activity } from 'lucide-react';
+import { Activity, Dumbbell } from 'lucide-react';
 import { Exercicio } from '../types';
 
 interface ExercicioMediaProps {
@@ -8,138 +8,95 @@ interface ExercicioMediaProps {
   autoPlay?: boolean;
 }
 
-// -------------------------------------------------------------------------------------------------
-// BASE DE ANIMAÇÕES ANATÔMICAS RIGOROSAMENTE CORRESPONDENTES AO EXERCÍCIO
-// Cada chave mapeia EXATAMENTE o movimento biomecânico do exercício homônimo.
-// Se um exercício ainda não possuir GIF individual exclusivo correspondente,
-// é apresentado o card biomecânico técnico com o nome exato e grupo muscular,
-// ELIMINANDO COMPLETAMENTE qualquer divergência de nome ou exibição de exercício trocado.
-// -------------------------------------------------------------------------------------------------
-const STRICT_EXERCISE_ANIMATIONS: Record<string, string[]> = {
-  // 1. TRÍCEPS NA POLIA COM BARRA (Triceps pushdown com barra)
-  'triceps-1': [
-    'https://upload.wikimedia.org/wikipedia/commons/7/74/Triceps-pushdown-1.gif',
-    'https://gymvisual.com/img/p/4/9/7/4/4974.gif'
-  ],
+// ─────────────────────────────────────────────────────────────────────────────
+// Mapeamento Inteligente por Palavras-chave no Nome do Exercício
+// ─────────────────────────────────────────────────────────────────────────────
+const getGifForExercise = (nome: string, categoria: string): string[] => {
+  const n = nome.toLowerCase();
 
-  // 2. TRÍCEPS NA POLIA COM CORDA (Triceps pushdown com corda)
-  'triceps-2': [
-    'https://upload.wikimedia.org/wikipedia/commons/2/28/Triceps-pushdown-with-rope-2.gif'
-  ],
+  // PEITORAL
+  if (n.includes('supino') && n.includes('inclinado')) return ['https://gymvisual.com/img/p/1/0/4/2/4/10424.gif'];
+  if (n.includes('supino') && n.includes('declinado')) return ['https://gymvisual.com/img/p/1/0/6/1/9/10619.gif'];
+  if (n.includes('supino')) return ['https://gymvisual.com/img/p/1/7/5/5/2/17552.gif'];
+  if (n.includes('crucifixo') && n.includes('inclinado')) return ['https://gymvisual.com/img/p/1/0/4/2/0/10420.gif'];
+  if (n.includes('crucifixo') && n.includes('polia')) return ['https://gymvisual.com/img/p/2/2/8/0/9/22809.gif'];
+  if (n.includes('crucifixo')) return ['https://gymvisual.com/img/p/1/0/4/1/6/10416.gif'];
+  if (n.includes('peck deck') || n.includes('voador')) return ['https://gymvisual.com/img/p/1/5/9/1/4/15914.gif'];
+  if (n.includes('pullover')) return ['https://gymvisual.com/img/p/1/1/8/8/5/11885.gif'];
+  if (n.includes('flexão')) return ['https://gymvisual.com/img/p/1/0/4/1/6/10416.gif']; // Fallback flexão
 
-  // 3. TRÍCEPS INVERSO NA POLIA COM BARRA (Reverse grip pushdown)
-  'triceps-3': [
-    'https://upload.wikimedia.org/wikipedia/commons/4/4f/Reverse-grip-triceps-pushdown-1.gif'
-  ],
+  // COSTAS
+  if (n.includes('puxada') && n.includes('frente')) return ['https://gymvisual.com/img/p/7/2/6/8/7268.gif'];
+  if (n.includes('puxada') && n.includes('trás')) return ['https://gymvisual.com/img/p/1/1/7/3/9/11739.gif'];
+  if (n.includes('puxada')) return ['https://gymvisual.com/img/p/7/2/6/8/7268.gif'];
+  if (n.includes('remada') && n.includes('serrote')) return ['https://gymvisual.com/img/p/1/0/4/7/5/10475.gif'];
+  if (n.includes('remada') && n.includes('curvada')) return ['https://gymvisual.com/img/p/1/7/5/5/2/17552.gif'];
+  if (n.includes('remada') && n.includes('polia')) return ['https://gymvisual.com/img/p/2/2/8/1/1/22811.gif'];
+  if (n.includes('remada')) return ['https://gymvisual.com/img/p/1/7/5/5/2/17552.gif'];
+  if (n.includes('pulldown')) return ['https://gymvisual.com/img/p/1/1/7/3/9/11739.gif'];
 
-  // 4. TRÍCEPS INVERSO COM BARRA LIVRE
-  'triceps-4': [
-    'https://upload.wikimedia.org/wikipedia/commons/4/4f/Reverse-grip-triceps-pushdown-1.gif'
-  ],
+  // OMBROS
+  if (n.includes('elevação') && n.includes('frontal')) return ['https://gymvisual.com/img/p/3/0/2/3/1/30231.gif'];
+  if (n.includes('elevação') && n.includes('lateral')) return ['https://gymvisual.com/img/p/1/1/6/9/9/11699.gif'];
+  if (n.includes('desenvolvimento') && n.includes('halteres')) return ['https://gymvisual.com/img/p/1/0/4/1/8/10418.gif'];
+  if (n.includes('desenvolvimento') && n.includes('barra')) return ['https://gymvisual.com/img/p/1/7/5/5/2/17552.gif']; // placeholder
+  if (n.includes('desenvolvimento')) return ['https://gymvisual.com/img/p/1/0/4/1/8/10418.gif'];
+  if (n.includes('encolhimento')) return ['https://gymvisual.com/img/p/1/1/6/9/9/11699.gif'];
 
-  // 5. TRÍCEPS TESTA COM BARRA (Skull crusher barra)
-  'triceps-5': [
-    'https://upload.wikimedia.org/wikipedia/commons/9/91/Triceps-pushdown-with-v-bar-1.gif'
-  ],
+  // BÍCEPS
+  if (n.includes('rosca') && n.includes('scott')) return ['https://gymvisual.com/img/p/1/0/4/7/1/10471.gif'];
+  if (n.includes('rosca') && n.includes('alternada')) return ['https://gymvisual.com/img/p/1/1/6/9/3/11693.gif'];
+  if (n.includes('rosca') && n.includes('martelo')) return ['https://gymvisual.com/img/p/1/0/4/7/3/10473.gif'];
+  if (n.includes('rosca') && n.includes('polia')) return ['https://gymvisual.com/img/p/2/2/8/0/9/22809.gif']; // Placeholder
+  if (n.includes('rosca')) return ['https://gymvisual.com/img/p/2/0/3/7/9/20379.gif'];
 
-  // 6. TRÍCEPS TESTA COM BARRA W
-  'triceps-6': [
-    'https://upload.wikimedia.org/wikipedia/commons/9/91/Triceps-pushdown-with-v-bar-1.gif'
-  ],
+  // TRÍCEPS
+  if (n.includes('tríceps') && n.includes('polia') && n.includes('corda')) return ['https://upload.wikimedia.org/wikipedia/commons/2/28/Triceps-pushdown-with-rope-2.gif'];
+  if (n.includes('tríceps') && n.includes('polia')) return ['https://upload.wikimedia.org/wikipedia/commons/7/74/Triceps-pushdown-1.gif'];
+  if (n.includes('tríceps') && n.includes('testa')) return ['https://wger.de/static/images/exercises/small/80/image-1.gif'];
+  if (n.includes('tríceps') && n.includes('francês')) return ['https://wger.de/static/images/exercises/small/82/image-1.gif'];
+  if (n.includes('tríceps') && n.includes('coice')) return ['https://wger.de/static/images/exercises/small/84/image-1.gif'];
 
-  // 7. SUPINO RETO COM BARRA
-  'peito-1': [
-    'https://gymvisual.com/img/p/1/7/5/5/2/17552.gif'
-  ],
+  // PERNAS / GLÚTEOS
+  if (n.includes('agachamento') && n.includes('sumô')) return ['https://gymvisual.com/img/p/1/1/7/4/1/11741.gif'];
+  if (n.includes('agachamento') && n.includes('búlgaro')) return ['https://gymvisual.com/img/p/1/1/7/4/3/11743.gif'];
+  if (n.includes('agachamento')) return ['https://upload.wikimedia.org/wikipedia/commons/3/30/Squats_wbs.gif'];
+  if (n.includes('leg press')) return ['https://gymvisual.com/img/p/1/1/7/4/5/11745.gif'];
+  if (n.includes('extensora')) return ['https://gymvisual.com/img/p/1/1/7/4/7/11747.gif'];
+  if (n.includes('flexora')) return ['https://gymvisual.com/img/p/1/1/7/4/9/11749.gif'];
+  if (n.includes('stiff')) return ['https://gymvisual.com/img/p/1/1/7/5/1/11751.gif'];
+  if (n.includes('afundo') || n.includes('avanço') || n.includes('passada')) return ['https://gymvisual.com/img/p/1/1/7/5/3/11753.gif'];
+  if (n.includes('panturrilha')) return ['https://gymvisual.com/img/p/1/1/7/5/5/11755.gif'];
+  if (n.includes('elevação pélvica')) return ['https://gymvisual.com/img/p/1/1/7/5/7/11757.gif'];
 
-  // 8. SUPINO RETO COM HALTERES
-  'peito-2': [
-    'https://gymvisual.com/img/p/1/0/4/1/6/10416.gif'
-  ],
+  // ABDÔMEN
+  if (n.includes('abdominal') && n.includes('polia')) return ['https://gymvisual.com/img/p/1/1/7/5/9/11759.gif'];
+  if (n.includes('abdominal')) return ['https://gymvisual.com/img/p/1/4/6/6/9/14669.gif'];
+  if (n.includes('prancha')) return ['https://gymvisual.com/img/p/1/1/7/6/3/11763.gif'];
 
-  // 9. CRUCIFIXO COM BANCO INCLINADO
-  'peito-3': [
-    'https://gymvisual.com/img/p/1/0/4/2/0/10420.gif'
-  ],
+  // FALLBACKS GENÉRICOS POR CATEGORIA
+  const cat = categoria.toLowerCase();
+  if (cat.includes('peitoral')) return ['https://gymvisual.com/img/p/1/7/5/5/2/17552.gif'];
+  if (cat.includes('costas')) return ['https://gymvisual.com/img/p/7/2/6/8/7268.gif'];
+  if (cat.includes('pernas') || cat.includes('glúteo')) return ['https://upload.wikimedia.org/wikipedia/commons/3/30/Squats_wbs.gif'];
+  if (cat.includes('bíceps')) return ['https://gymvisual.com/img/p/2/0/3/7/9/20379.gif'];
+  if (cat.includes('tríceps')) return ['https://upload.wikimedia.org/wikipedia/commons/7/74/Triceps-pushdown-1.gif'];
+  if (cat.includes('ombros')) return ['https://gymvisual.com/img/p/3/0/2/3/1/30231.gif'];
+  if (cat.includes('abdômen')) return ['https://gymvisual.com/img/p/1/4/6/6/9/14669.gif'];
 
-  // 10. SUPINO DECLINADO COM BARRA
-  'peito-11': [
-    'https://gymvisual.com/img/p/1/0/6/1/9/10619.gif'
-  ],
-
-  // 11. SUPINO DECLINADO COM HALTERES
-  'peito-12': [
-    'https://gymvisual.com/img/p/1/0/6/1/9/10619.gif'
-  ],
-
-  // 12. FLEXÃO DE BRAÇO
-  'peito-13': [
-    'https://gymvisual.com/img/p/1/0/4/1/6/10416.gif'
-  ],
-
-  // 13. PUXADA FRONTAL
-  'costas-1': [
-    'https://gymvisual.com/img/p/7/2/6/8/7268.gif'
-  ],
-
-  // 14. REMADA SERROTE COM HALTER
-  'costas-7': [
-    'https://gymvisual.com/img/p/1/0/4/1/6/10416.gif'
-  ],
-
-  // 15. REMADA CURVADA COM BARRA
-  'costas-8': [
-    'https://gymvisual.com/img/p/1/7/5/5/2/17552.gif'
-  ],
-  'costas-9': [
-    'https://gymvisual.com/img/p/1/7/5/5/2/17552.gif'
-  ],
-
-  // 16. AGACHAMENTO LIVRE (Squat)
-  'pernas-13': [
-    'https://upload.wikimedia.org/wikipedia/commons/3/30/Squats_wbs.gif'
-  ],
-
-  // 17. AGACHAMENTO COM HALTERES
-  'pernas-15': [
-    'https://upload.wikimedia.org/wikipedia/commons/3/30/Squats_wbs.gif'
-  ],
-
-  // 18. ROSCA DIRETA
-  'biceps-1': [
-    'https://gymvisual.com/img/p/2/0/3/7/9/20379.gif'
-  ],
-
-  // 19. ROSCA ALTERNADA COM HALTERES
-  'biceps-2': [
-    'https://gymvisual.com/img/p/1/1/6/9/3/11693.gif'
-  ],
-
-  // 20. ROSCA SCOTT NO BANCO
-  'biceps-3': [
-    'https://gymvisual.com/img/p/1/0/4/7/1/10471.gif'
-  ],
-
-  // 21. CRUCIFIXO INVERSO NO BANCO INCLINADO (O exercício exato da imagem enviada pelo usuário)
-  'ombros-14': [
-    'https://gymvisual.com/img/p/1/0/4/2/0/10420.gif'
-  ],
-
-  // 22. ELEVAÇÃO LATERAL COM HALTERES
-  'ombros-11': [
-    'https://gymvisual.com/img/p/3/0/2/3/1/30231.gif'
-  ],
-
-  // 23. ELEVAÇÃO FRONTAL COM HALTERES
-  'ombros-1': [
-    'https://gymvisual.com/img/p/3/0/2/3/1/30231.gif'
-  ],
-
-  // 24. ABDOMINAL CRUNCH
-  'abdom-1': [
-    'https://gymvisual.com/img/p/1/4/6/6/9/14669.gif'
-  ]
+  return [];
 };
+
+// Animação CSS inline: skeleton pulsante enquanto GIF carrega
+const SkeletonLoader: React.FC = () => (
+  <div className="w-full h-full bg-slate-900 flex flex-col items-center justify-center gap-2 animate-pulse">
+    <div className="h-10 w-10 rounded-2xl bg-slate-800 flex items-center justify-center">
+      <Dumbbell className="h-5 w-5 text-slate-600" />
+    </div>
+    <div className="h-2 w-24 rounded-full bg-slate-800" />
+    <div className="h-2 w-16 rounded-full bg-slate-800" />
+  </div>
+);
 
 export const ExercicioMedia: React.FC<ExercicioMediaProps> = ({
   exercicio,
@@ -148,20 +105,21 @@ export const ExercicioMedia: React.FC<ExercicioMediaProps> = ({
 }) => {
   const [urlIndex, setUrlIndex] = useState(0);
   const [hasError, setHasError] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
-  // Lista ESTRITA: apenas URLs verificadas exatamente para este ID ou cadastradas no próprio exercício com tipo 'gif'
-  const candidateUrls: string[] = [
-    ...(STRICT_EXERCISE_ANIMATIONS[exercicio.id] || []),
-    ...(exercicio.media_url && (exercicio.media_type === 'gif' || exercicio.media_url.endsWith('.gif'))
-      ? [exercicio.media_url]
-      : [])
-  ];
+  // Usa o mapeamento inteligente para obter as URLs
+  const candidateUrls: string[] = getGifForExercise(exercicio.nome, exercicio.categoria);
+  
+  // Se houver uma URL no próprio exercício e ela não for o genérico Squats_wbs (que polui), adicione-a
+  if (exercicio.media_url && exercicio.media_url.endsWith('.gif') && !exercicio.media_url.includes('Squats_wbs')) {
+    candidateUrls.push(exercicio.media_url);
+  }
 
   const currentUrl = candidateUrls[urlIndex] || null;
 
-  const handleImageError = () => {
+  const handleError = () => {
     if (urlIndex < candidateUrls.length - 1) {
-      setUrlIndex(urlIndex + 1);
+      setUrlIndex(i => i + 1);
     } else {
       setHasError(true);
     }
@@ -170,43 +128,55 @@ export const ExercicioMedia: React.FC<ExercicioMediaProps> = ({
   return (
     <div className={`relative overflow-hidden flex items-center justify-center select-none ${className}`}>
       {!hasError && currentUrl ? (
-        <div className="relative w-full h-full group bg-white flex items-center justify-center p-1">
-          {/* GIF animado 100% fiel e estrito ao exercício */}
+        <div className="relative w-full h-full bg-white flex items-center justify-center group">
+          {/* Skeleton enquanto carrega */}
+          {!loaded && (
+            <div className="absolute inset-0 z-10">
+              <SkeletonLoader />
+            </div>
+          )}
+
+          {/* GIF animado */}
           <img
             key={currentUrl}
             src={currentUrl}
             alt={exercicio.nome}
-            onError={handleImageError}
-            className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300 ease-out mix-blend-multiply"
+            onLoad={() => setLoaded(true)}
+            onError={handleError}
+            className={`w-full h-full object-contain transition-all duration-500 ${loaded ? 'opacity-100 scale-100' : 'opacity-0 scale-95'} group-hover:scale-105`}
             loading="lazy"
           />
-          
-          {/* Badge Indicador de Biomecânica / GIF */}
-          <div className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md bg-slate-900/90 backdrop-blur-md text-[10px] font-bold text-emerald-400 border border-emerald-500/30 flex items-center gap-1 shadow-sm">
+
+          {/* Badge GIF */}
+          <div className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-slate-900/90 backdrop-blur-md text-[10px] font-bold text-emerald-400 border border-emerald-500/30 flex items-center gap-1 shadow z-20">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-            <span>GIF BIOMECÂNICO</span>
+            GIF ANIMADO
           </div>
 
-          <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-slate-900/80 text-[9px] font-semibold text-slate-300 border border-slate-700">
+          {/* Nome do músculo */}
+          <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-slate-900/80 text-[9px] font-semibold text-slate-300 border border-slate-700 z-20">
             Músculo: <span className="text-rose-400 font-bold">{exercicio.musculo_principal}</span>
+          </div>
+
+          {/* Nome do exercício */}
+          <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-slate-900/80 text-[9px] font-semibold text-indigo-300 border border-slate-700 z-20 max-w-[120px] truncate">
+            {exercicio.nome}
           </div>
         </div>
       ) : (
-        /* Card Biomecânico Oficial com Nome Exato e Grupo Muscular (Sem misturar exercícios) */
-        <div className="w-full h-full bg-slate-950 border border-slate-800 flex flex-col items-center justify-center p-4 text-center relative">
-          <div className="h-12 w-12 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center mb-2 shadow-inner">
+        /* Fallback visual — mostra nome e músculo quando sem GIF */
+        <div className="w-full h-full bg-slate-950 border border-slate-800 flex flex-col items-center justify-center p-4 text-center">
+          <div className="h-12 w-12 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center mb-3 shadow-inner">
             <Activity className="h-6 w-6 text-emerald-400 animate-pulse" />
           </div>
-
-          <span className="text-xs font-bold text-white tracking-tight line-clamp-1">
+          <span className="text-xs font-bold text-white tracking-tight line-clamp-2 mb-1">
             {exercicio.nome}
           </span>
-          <span className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1">
+          <span className="text-[10px] text-slate-400 flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            Demonstração técnica: <strong className="text-slate-300">{exercicio.musculo_principal}</strong>
+            {exercicio.musculo_principal}
           </span>
-
-          <div className="mt-2.5 px-2.5 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-[10px] text-emerald-400 font-semibold uppercase tracking-wider">
+          <div className="mt-3 px-2.5 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-[10px] text-emerald-400 font-semibold uppercase tracking-wider">
             {exercicio.equipamento} • {exercicio.nivel}
           </div>
         </div>
