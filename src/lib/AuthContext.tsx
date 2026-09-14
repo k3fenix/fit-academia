@@ -7,14 +7,23 @@ interface AuthContextType {
   role: UserRole | null;
   academiaId: string | null;
   loading: boolean;
-  login: (email: string, role?: UserRole) => Promise<boolean>;
+  login: (email: string, password: string, role?: UserRole) => Promise<boolean>;
   logout: () => void;
   switchRole: (role: UserRole) => void;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<{ ok: boolean; message: string }>;
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
-// Perfis mock para teste instantâneo
+// Credenciais demo com senha padrão
+const DEMO_CREDENTIALS: Record<string, { password: string; role: UserRole }> = {
+  'admin@fitsaude.com':         { password: 'admin123',  role: 'admin' },
+  'contato@fitpower.com.br':    { password: 'academia123', role: 'academia' },
+  'joao.silva@email.com':       { password: 'aluno123',  role: 'aluno' },
+  'carlos.personal@fitsaude.com': { password: 'prof123', role: 'professor' },
+};
+
+// Perfis mock
 const DEMO_PROFILES: Record<UserRole, UserProfile> = {
   admin: {
     id: 'user-admin',
@@ -49,10 +58,34 @@ const DEMO_PROFILES: Record<UserRole, UserProfile> = {
   }
 };
 
+// Armazena senhas customizadas no localStorage
+const STORAGE_PASSWORDS_KEY = 'fitsaude_demo_passwords';
+
+const getSavedPasswords = (): Record<string, string> => {
+  try {
+    const raw = localStorage.getItem(STORAGE_PASSWORDS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
+
+const savePassword = (email: string, password: string) => {
+  const current = getSavedPasswords();
+  current[email] = password;
+  localStorage.setItem(STORAGE_PASSWORDS_KEY, JSON.stringify(current));
+};
+
+const getEffectivePassword = (email: string): string => {
+  const saved = getSavedPasswords();
+  if (saved[email]) return saved[email];
+  return DEMO_CREDENTIALS[email]?.password || '';
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(() => {
     const saved = localStorage.getItem('fitsaude_user');
-    return saved ? JSON.parse(saved) : DEMO_PROFILES.academia; // Default direto na academia para teste rápido
+    return saved ? JSON.parse(saved) : null;
   });
   const [loading, setLoading] = useState<boolean>(false);
 
@@ -64,38 +97,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [user]);
 
-  const login = async (email: string, explicitRole?: UserRole): Promise<boolean> => {
+  const login = async (email: string, password: string, explicitRole?: UserRole): Promise<boolean> => {
     setLoading(true);
     try {
+      // Tenta Supabase real
       if (isSupabaseConfigured()) {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password: 'dummy-password'
-        });
-        if (error) throw error;
-        // Carrega o profile do Supabase
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', data.user.id)
-          .single();
-        if (profile) {
-          setUser(profile);
-          setLoading(false);
-          return true;
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (!error && data.user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', data.user.id)
+            .single();
+          if (profile) {
+            setUser(profile);
+            setLoading(false);
+            return true;
+          }
         }
       }
 
-      // Detecção inteligente por e-mail ou fallback
-      let determinedRole: UserRole = explicitRole || 'academia';
-      if (email.includes('admin')) determinedRole = 'admin';
-      else if (email.includes('prof')) determinedRole = 'professor';
-      else if (email.includes('aluno') || email.includes('joao')) determinedRole = 'aluno';
+      // Fallback demo: valida senha
+      const cred = DEMO_CREDENTIALS[email.toLowerCase()];
+      const effectivePassword = getEffectivePassword(email.toLowerCase());
 
-      const matchedProfile = DEMO_PROFILES[determinedRole];
-      setUser({ ...matchedProfile, email });
+      if (cred && password === effectivePassword) {
+        const role = explicitRole || cred.role;
+        const profile = DEMO_PROFILES[role];
+        setUser({ ...profile, email: email.toLowerCase() });
+        setLoading(false);
+        return true;
+      }
+
+      // Aceitação por role sem senha (atalho demo pelos botões)
+      if (explicitRole && !password) {
+        setUser({ ...DEMO_PROFILES[explicitRole] });
+        setLoading(false);
+        return true;
+      }
+
       setLoading(false);
-      return true;
+      return false;
     } catch (err) {
       console.error('Erro no login:', err);
       setLoading(false);
@@ -104,15 +146,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
-    if (isSupabaseConfigured()) {
-      supabase.auth.signOut();
-    }
+    if (isSupabaseConfigured()) supabase.auth.signOut();
     setUser(null);
     localStorage.removeItem('fitsaude_user');
   };
 
   const switchRole = (newRole: UserRole) => {
     setUser(DEMO_PROFILES[newRole]);
+  };
+
+  const changePassword = async (currentPassword: string, newPassword: string): Promise<{ ok: boolean; message: string }> => {
+    if (!user) return { ok: false, message: 'Usuário não autenticado.' };
+    if (newPassword.length < 6) return { ok: false, message: 'A nova senha deve ter ao menos 6 caracteres.' };
+
+    // Valida senha atual
+    const effectiveCurrent = getEffectivePassword(user.email);
+    if (currentPassword !== effectiveCurrent) {
+      return { ok: false, message: 'Senha atual incorreta.' };
+    }
+    if (currentPassword === newPassword) {
+      return { ok: false, message: 'A nova senha não pode ser igual à atual.' };
+    }
+
+    // Atualiza no Supabase se configurado
+    if (isSupabaseConfigured()) {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) return { ok: false, message: `Erro Supabase: ${error.message}` };
+    }
+
+    // Salva localmente no modo demo
+    savePassword(user.email, newPassword);
+    return { ok: true, message: 'Senha alterada com sucesso!' };
   };
 
   return (
@@ -124,7 +188,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loading,
         login,
         logout,
-        switchRole
+        switchRole,
+        changePassword
       }}
     >
       {children}
